@@ -1,0 +1,13 @@
+NGINX 热升级流程
+
+cd /usr/local/nginx
+cp nginx nginx_bak 
+mv /data/nginx/nginx ./nginx #需要使用mv来更新二进制文件
+./nginx -t #尝试启动，查看其加载配置文件等初始化功能是否正常
+
+netstat -anp | grep -E "80|443" | grep nginx #检查连接状态
+kill -USR2 `cat /usr/local/nginx/nginx.pid` #升级nginx可执行文件，此时会有两组nginx master和worker进程
+kill -WINCH `cat /usr/local/nginx/nginx.pid.oldbin` #新的可执行文件启动ok，且能够正常处理数据流，告知老的master进程去通知其worker进程进行优雅退出
+
+...
+kill -QUIT `cat /usr/local/nginx/nginx.pid.oldbin` #待所有的老的nginx worker进程优雅退出后（处理完连接），停止老的master进程
