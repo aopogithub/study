@@ -1,0 +1,31 @@
+执行以下命令，查看nf_conntrack_max参数。
+# sysctl net.netfilter.nf_conntrack_max
+
+检查当前正在跟踪的连接数。
+# cat /proc/sys/net/netfilter/nf_conntrack_count
+
+如果该值达到nf_conntrack_max值则会出现包被丢弃的现象。
+
+提高net.netfilter.nf_conntrack_max值（以内存为64G，net.netfilter.nf_conntrack_max值2097152为例）。
+执行以下命令，使配置即时生效。
+
+# sysctl -w net.netfilter.nf_conntrack_max=2097152
+
+执行以下命令确保重启后配置仍然生效。
+
+# echo "net.netfilter.nf_conntrack_max = 2097152" >> /etc/sysctl.conf
+====================================================================
+net.netfilter.nf_conntrack_max不是越高越好，通常根据内存大小进行设置。
+nf_conntrack_max计算公式（64位）
+CONNTRACK_MAX = RAMSIZE (inbytes)/16384/2
+
+例如你的机器是一个64GB 64bit的系统，那么最合适的值是
+
+CONNTRACK_MAX = 64*1024*1024*1024/16384/2 = 2097152
+
+net.netfilter.nf_conntrack_buckets 即是 /sys/module/nf_conntrack/parameters/hashsize
+
+计算新的哈希值：在CentOS 6及以上版本，计算公式是hashsize = conntrack_max/4
+
+
+内存计算  https://www.starduster.me/2019/07/05/nf-conntrack-tuning/
