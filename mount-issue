@@ -9,7 +9,8 @@ Mar 07 23:35:09 vm01-centos systemd[1]: Unmounted /mnt.
 mount完成后，由于某些原因，又再次被systemd卸载
 
 二、复现步骤：
-先在/mnt 挂载磁盘1 ，然后删除磁盘1 ，挂载磁盘2 ，此时mount 磁盘2到mnt 复现问题
+先在/mnt 挂载磁盘1 ，并写入fstab。
+然后删除磁盘1 ，挂载磁盘2 ，此时mount 磁盘2到mnt 复现问题。
 
 三、解决方案：注释fstab中的mnt挂载配置，执行systemctl daemon-reload 后恢复
 
