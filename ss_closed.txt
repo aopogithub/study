@@ -1,0 +1,35 @@
+问题现象：ss -s查到很多tcp链接，多数是closed ，但是 ss -ant | wc -l 查到的较少：
+
+[root@ls ~]# ss -s
+Total: 381
+TCP:   100 (estab 12, closed 77, orphaned 0, timewait 0)
+
+Transport Total     IP        IPv6
+RAW	  3         1         2        
+UDP	  11        6         5        
+TCP	  23        18        5        
+INET	  37        25        12       
+FRAG	  0         0         0        
+
+[root@ls ~]# ss -ant | wc -l
+24
+
+原因分析：两种可能性：
+1，docker环境，容器中的socket
+2，代码问题，创建了socket，却没有使用
+
+1，
+
+
+
+2，简单复现代码：初始化一个socketfd ，但不去使用，没有调bind listen connect等方法。
+#include <sys/types.h> 
+#include <sys/socket.h>
+#include <unistd.h>
+int main(){
+	int n = 1;
+	while (n <= 10000){
+		int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+		sleep(1);
+	}
+}
