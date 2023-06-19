@@ -5,4 +5,9 @@ wireshark学习：
 TCP Out-of-Order： 后一个包的 Seq 号小于前一个包的 Seq+Len 时。
 -----重复ACK-----
 TCP Dup ACK： 当乱序或丢包发生时，会收到一些 Seq 号比期望值大的包。每收到一个这种包就会 Ack 一次期望的 Seq 值，提醒对方。
+  <<<
+  通过一个dup ACK并不能可靠的确认是发生了丢包还是发生了乱序传输，因此会存在一个门限(duplicate ACK threshold或者叫做dupthresh)，当TCP收到的dup ACK数超过这个门限的时候，就会认为发生了丢包，进而初始化一个快速重传。最初协议中给出的dupthresh这个门限是3，但是RFC 4653给出了一种调整dupthresh的方法。Linux中则可以通过/proc/sys/net/ipv4/tcp_reordering来设置默认值，另外Linux可能还会根据乱序测量的结果来更新实际的dupthresh。dupthresh的范围最终会在/proc/sys/net/ipv4/tcp_reordering和/proc/sys/net/ipv4/tcp_max_reordering之间。在没有使能SACK的时候，快速重传只会重传一个数据包，在使能SACK时候，SACK可以反映接收端是否存在系列号洞，进而允许发送端根据SACK的情况同时传输多个数据包。
+  >>>
+-----快速重传-----
+TCP Fast Retransmission：三次DUP ACK之后出发快速重传。（发送端后端观测，前端抓包看一个Dup ACK就发出了，应该是有缓存，3个DUP ACK之后才真正发出）
 
