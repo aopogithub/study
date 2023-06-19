@@ -1,1 +1,8 @@
+wireshark学习：
+
+1，wireshark解析关键字：
+-----乱序----
+TCP Out-of-Order： 后一个包的 Seq 号小于前一个包的 Seq+Len 时。
+-----重复ACK-----
+TCP Dup ACK： 当乱序或丢包发生时，会收到一些 Seq 号比期望值大的包。每收到一个这种包就会 Ack 一次期望的 Seq 值，提醒对方。
 
