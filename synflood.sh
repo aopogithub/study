@@ -16,7 +16,8 @@ if [ ! $? = 0 ];then
 fi
 iptables -A OUTPUT -p tcp -m tcp --tcp-flags RST RST -j DROP
 
-for i in {1..$1}
+while i < $1
 do
   while : ; do nmap  -nsS -p 22  192.168.101.216 > /dev/null ;done &
+  i+=1
 done
