@@ -1,0 +1,111 @@
+TCP连接的断开有两种方式：
+一、连接正常关闭时双方会发送FIN，经历4次挥手过程；
+二、通过RST包异常退出，此时会丢弃缓冲区内的数据，也不会对RST响应ACK。
+
+TCP异常终止的常见情形：
+1.  客户端尝试与服务器未对外提供服务的端口建立TCP连接，服务器将会直接向客户端发送reset报文。
+2.  客户端和服务器的某一方在交互的过程中发生异常（如程序崩溃等），该方系统将向对端发送TCP reset报文，告之对方释放相关的TCP连接。
+3.  接收端收到TCP报文，但是发现该TCP的报文，并不在其已建立的TCP连接列表内，则其直接向对端发送reset报文。
+4.  在交互的双方中的某一方长期未收到来自对方的确认报文，则其在超出一定的重传次数或时间后，会主动向对端发送reset报文释放该TCP连接。
+5.  有些应用开发者在设计应用系统时，会利用reset报文快速释放已经完成数据交互的TCP连接，以提高业务交互的效率。
+
+
+(java)那什么时候会用RST而非FIN关闭连接呢？
+1,Socket#setSoLinger(true,0)，则close时会发送RST
+2,如果主动关闭方缓冲区还有数据没有被应用层消费掉，close会发送RST并忽略这些数据
+3,A向B发送数据，B已经通过close()方法关闭了Socket，虽然TCP规定半关闭状态下B仍然可以接收数据，
+但close动作关闭了该socket上的任何数据操作，如果此时A继续write，B将返回RST，A的该次write无法立即通知应用层（因为write仅把数据写入发送缓冲区），
+只会把状态保存在tcp协议栈内，下次write时才会抛出SocketException。
+
+一段示例代码，使用setsockopt SO_LINGER 实现close 发送RST:
+#include <stdio.h>  
+#include <stdlib.h>  
+#include <string.h>  
+#include <unistd.h>  
+#include <sys/socket.h>  
+#include <netinet/in.h>  
+#include <arpa/inet.h>  
+#include <errno.h>  
+  
+#define SERVER_IP "192.168.101.153"  
+#define SERVER_PORT 8080  
+#define TIMEOUT 15  // 15秒超时  
+  
+int main() {  
+    int sockfd;  
+    struct sockaddr_in serv_addr;
+    struct linger so_linger;  
+    fd_set readfds;  
+    struct timeval tv;  
+    char buffer[1024];  
+    int bytes_read;  
+  
+    // 创建socket  
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {  
+        perror("socket creation failed");  
+        exit(EXIT_FAILURE);  
+    }  
+  
+    memset(&serv_addr, 0, sizeof(serv_addr));  
+  
+    // 填充服务器信息  
+    serv_addr.sin_family = AF_INET;  
+    serv_addr.sin_port = htons(SERVER_PORT);  
+  
+    // 将IPv4地址从文本转换为二进制形式  
+    if(inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr)<=0) {  
+        perror("Invalid address/ Address not supported");  
+        exit(EXIT_FAILURE);  
+    }  
+  
+    // 连接到服务器  
+    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {  
+        perror("Connection Failed");  
+        exit(EXIT_FAILURE);  
+    }  
+  
+    printf("Connected to server\n");  
+    // 设置SO_LINGER选项以尝试立即关闭连接  
+    so_linger.l_onoff = 1; // 启用SO_LINGER  
+    so_linger.l_linger = 0; // 超时时间为0，表示尽可能快地关闭连接  
+    if (setsockopt(sockfd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger)) < 0) {  
+        perror("setsockopt(SO_LINGER) failed");  
+        // 处理错误，比如关闭socket并退出  
+        close(sockfd);  
+        exit(EXIT_FAILURE);  
+    } 
+    // 设置select的超时时间  
+    tv.tv_sec = TIMEOUT;  
+    tv.tv_usec = 0;  
+  
+    while (1) {  
+        FD_ZERO(&readfds);  
+        FD_SET(sockfd, &readfds);  
+  
+        // 使用select等待socket可读或超时  
+        int select_ret = select(sockfd + 1, &readfds, NULL, NULL, &tv);  
+  
+        if (select_ret == -1) {  
+            perror("select error");  
+            break;  
+        } else if (select_ret == 0) {  
+            // 超时发生  
+            printf("No data from server for %d seconds. Closing connection.\n", TIMEOUT);  
+            close(sockfd);  
+            break;  
+        } else if (FD_ISSET(sockfd, &readfds)) {  
+            // 数据可读  
+            bytes_read = read(sockfd, buffer, sizeof(buffer) - 1);  
+            if (bytes_read < 0) {  
+                perror("read failed");  
+                close(sockfd);  
+                break;  
+            }  
+            buffer[bytes_read] = '\0';  
+            printf("Received: %s", buffer);  
+        }  
+    }  
+  
+    printf("Client closed.\n");  
+    return 0;  
+}
